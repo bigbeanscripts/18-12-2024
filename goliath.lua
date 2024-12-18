@@ -140,7 +140,6 @@ local Window = Fluent:CreateWindow({
 
 -- Tabs
 local Tabs = {
-    Halloween = Window:AddTab({ Title = "Halloween", Icon = "ghost" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
     PlayerSettings = Window:AddTab({ Title = "Player Settings", Icon = "user" }),
     Keybinds = Window:AddTab({ Title = "Keybinds", Icon = "keyboard" }),
