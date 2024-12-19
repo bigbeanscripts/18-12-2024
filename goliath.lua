@@ -190,7 +190,7 @@ Fluent:Notify({
 })
 
 local Machines = Tabs.Machines
-
+local Section = Tabs.Machines:AddSection("Mutations")
 
 -- Services and Variables
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -467,6 +467,10 @@ Tabs.Machines:AddButton({
 -- Initial fetch and start dropdown refresh
 fetchOwnedPets()
 startDropdownRefresh()
+
+
+local Section = Tabs.Machines:AddSection("Goliath")
+
 
 
 
