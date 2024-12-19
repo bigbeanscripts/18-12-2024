@@ -191,20 +191,18 @@ Fluent:Notify({
 
 local Machines = Tabs.Machines
 
-Tabs.Machines:AddParagraph({
-    Title = "Auto Mutate",
-    Content = "Not finished"
-})
 
 -- Services and Variables
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PetServiceRF = ReplicatedStorage.Packages.Knit.Services.PetService.RF:FindFirstChild("getOwned")
 local PetCombineService = ReplicatedStorage.Packages.Knit.Services.PetCombineService.RF
 
-local ownedPetDisplayNames = {}
+local ownedPetData = {}  -- Store full pet data including locked status
+local uniquePetNames = {}
 local selectedPetName = nil
 local selectedMutation = nil
 local stopLoop = false
+local hasReportedCompletion = false
 
 -- Helpers
 local function getMutation(tbl)
@@ -224,53 +222,157 @@ local function getMutation(tbl)
 end
 
 local function fetchOwnedPets()
+    ownedPetData = {}
+    uniquePetNames = {}
+
     if PetServiceRF and PetServiceRF:IsA("RemoteFunction") then
-        print("Fetching owned pets...")
         local success, petData = pcall(function()
             return PetServiceRF:InvokeServer()
         end)
 
         if success and petData then
-            ownedPetDisplayNames = {}
             for petId, petInfo in pairs(petData) do
-                local mutationType = getMutation(petInfo) or "No Mutation"
-                table.insert(ownedPetDisplayNames, { Name = petInfo.DisplayName or "Unknown", Id = petId, Mutation = mutationType })
+                local displayName = petInfo.DisplayName or "Unknown"
+                
+                if not ownedPetData[displayName] then
+                    ownedPetData[displayName] = {}
+                end
+                
+                table.insert(ownedPetData[displayName], {
+                    Id = petId,
+                    Locked = petInfo.Locked,
+                    Mutation = getMutation(petInfo) or "No Mutation"
+                })
             end
-            print("Successfully loaded pets:", #ownedPetDisplayNames)
-        else
-            warn("Failed to fetch owned pets.")
+
+            for petName, petInstances in pairs(ownedPetData) do
+                for _, petInfo in ipairs(petInstances) do
+                    if not petInfo.Locked then
+                        if not table.find(uniquePetNames, petName) then
+                            table.insert(uniquePetNames, petName)
+                        end
+                        break
+                    end
+                end
+            end
+            return true
         end
-    else
-        warn("Could not access RemoteFunction 'getOwned'.")
+        return false
+    end
+    return false
+end
+
+-- Create Pet Dropdown first
+local PetDropdown = Tabs.Machines:AddDropdown("PetDropdown", {
+    Title = "Select Pet",
+    Description = "Choose a specific unlocked pet name to mutate.",
+    Values = uniquePetNames,
+    Multi = false,
+})
+
+-- Dropdown Refresh Function
+local function refreshDropdown()
+    if fetchOwnedPets() then
+        PetDropdown:SetValues(uniquePetNames)
+        
+        if selectedPetName and not table.find(uniquePetNames, selectedPetName) then
+            selectedPetName = nil
+            PetDropdown:SetValue(nil)
+        end
     end
 end
 
-local function curePet(petId)
-    print("Curing pet:", petId)
-    local cureArgs = { [1] = petId }
-    local success, _ = pcall(function()
-        return PetCombineService.cure:InvokeServer(unpack(cureArgs))
+-- Periodic Dropdown Refresh
+local function startDropdownRefresh()
+    spawn(function()
+        while true do
+            refreshDropdown()
+            wait(5)
+        end
     end)
-    if success then print("Cured pet:", petId) else warn("Failed to cure pet:", petId) end
 end
 
-local function mutatePet(petId)
-    print("Attempting to mutate pet:", petId)
-    local mutateArgs = { [1] = petId, [2] = {} }
-    local success, _ = pcall(function()
-        return PetCombineService.mutate:InvokeServer(unpack(mutateArgs))
-    end)
-    if success then print("Mutation sent for pet:", petId) else warn("Mutation failed for pet:", petId) end
+-- Dropdown Selection Handler
+PetDropdown:OnChanged(function(value)
+    selectedPetName = value
+    hasReportedCompletion = false
+    
+    -- Print unlocked pet IDs for the selected pet
+    if selectedPetName then
+        local petInstances = ownedPetData[selectedPetName] or {}
+        print("\nUnlocked Pet IDs for", selectedPetName .. ":")
+        for _, petInfo in ipairs(petInstances) do
+            if not petInfo.Locked then
+                print(petInfo.Id)
+            end
+        end
+    end
+end)
+
+local MutationDropdown = Tabs.Machines:AddDropdown("MutationDropdown", {
+    Title = "Select Mutation",
+    Description = "Choose a mutation to aim for.",
+    Values = { "Glowing", "Rainbow", "Ghost" },
+    Multi = false,
+})
+
+MutationDropdown:OnChanged(function(value)
+    selectedMutation = value
+    hasReportedCompletion = false
+end)
+
+local function shouldProcessPet(pet)
+    -- If Keep Ghost is enabled and pet is Ghost, don't process it
+    if KeepGhostToggle.Value and pet.Mutation == "Ghost" then
+        return false
+    end
+    
+    -- Process if pet has no mutation or wrong mutation
+    return pet.Mutation == "No Mutation" or pet.Mutation ~= selectedMutation
+end
+
+local function checkAllPetsMutated()
+    if not selectedPetName or not selectedMutation then return false end
+    
+    local petsToProcess = {}
+    for _, petInfo in pairs(ownedPetData[selectedPetName]) do
+        if not petInfo.Locked then
+            table.insert(petsToProcess, petInfo)
+        end
+    end
+    
+    for _, pet in pairs(petsToProcess) do
+        -- Consider a Ghost pet as "mutated" if Keep Ghost is enabled
+        if KeepGhostToggle.Value and pet.Mutation == "Ghost" then
+            continue
+        end
+        
+        if pet.Mutation ~= selectedMutation then
+            return false
+        end
+    end
+    
+    return true
 end
 
 local function autoCureThenMutateLoop()
     stopLoop = false
+    hasReportedCompletion = false
     while not stopLoop do
         if selectedPetName and selectedMutation then
+            if checkAllPetsMutated() then
+                if not hasReportedCompletion then
+                    print("Finished mutating all selected pets!")
+                    hasReportedCompletion = true
+                end
+                wait(2)
+                continue
+            end
+            
             local petsToProcess = {}
-            for _, pet in pairs(ownedPetDisplayNames) do
-                if pet.Name == selectedPetName then
-                    table.insert(petsToProcess, pet)
+            for _, petInfo in pairs(ownedPetData[selectedPetName]) do
+                if not petInfo.Locked and shouldProcessPet(petInfo) then
+                    table.insert(petsToProcess, petInfo)
                 end
             end
 
@@ -278,69 +380,41 @@ local function autoCureThenMutateLoop()
                 if stopLoop then break end
 
                 if pet.Mutation ~= selectedMutation then
-                    if pet.Mutation ~= "No Mutation" then
-                        print("Curing incorrect mutation for pet:", pet.Id)
-                        curePet(pet.Id)
+                    -- Don't cure Ghost pets if Keep Ghost is enabled
+                    if pet.Mutation ~= "No Mutation" and 
+                       not (KeepGhostToggle.Value and pet.Mutation == "Ghost") then
+                        local cureArgs = { [1] = pet.Id }
+                        pcall(function()
+                            return PetCombineService.cure:InvokeServer(unpack(cureArgs))
+                        end)
                     elseif pet.Mutation == "No Mutation" then
-                        print("Mutating pet without mutation:", pet.Id)
-                        mutatePet(pet.Id)
+                        local mutateArgs = { [1] = pet.Id, [2] = {} }
+                        pcall(function()
+                            return PetCombineService.mutate:InvokeServer(unpack(mutateArgs))
+                        end)
                     end
-                    wait(1) -- Wait for server response
+                    wait(1)
                     fetchOwnedPets()
-                    for _, updatedPet in pairs(ownedPetDisplayNames) do
-                        if updatedPet.Id == pet.Id then
-                            pet.Mutation = updatedPet.Mutation
-                            break
-                        end
-                    end
-                else
-                    print("Pet already has the desired mutation:", pet.Id)
                 end
             end
         else
             warn("Please select a pet name and mutation before enabling Auto Mutate.")
         end
-        wait(1)
+        wait(2)
     end
 end
 
-fetchOwnedPets()
-wait(1)
-
-local uniquePetNames = {}
-for _, pet in pairs(ownedPetDisplayNames) do
-    if not table.find(uniquePetNames, pet.Name) then
-        table.insert(uniquePetNames, pet.Name)
-    end
-end
-
-local PetDropdown = Tabs.Machines:AddDropdown("PetDropdown", {
-    Title = "Select Pet",
-    Description = "Choose a specific pet name to mutate.",
-    Values = uniquePetNames,
-    Multi = false,
+-- Add Keep Ghost Toggle
+local KeepGhostToggle = Tabs.Machines:AddToggle("KeepGhostToggle", {
+    Title = "Keep Ghost Pets",
+    Description = "Keep pets if they become Ghost mutation, even if Ghost isn't selected.",
+    Default = false,
 })
 
-PetDropdown:OnChanged(function(value)
-    selectedPetName = value
-    print("Selected Pet Name:", selectedPetName)
-end)
-
-local MutationDropdown = Tabs.Machines:AddDropdown("MutationDropdown", {
-    Title = "Select Mutation",
-    Description = "Choose a mutation to aim for.",
-    Values = { "Rainbow", "Glowing", "Ghost" },
-    Multi = false
-})
-
-MutationDropdown:OnChanged(function(value)
-    selectedMutation = value
-    print("Selected target mutation:", value)
-end)
-
+-- Add Auto Mutate Toggle
 local AutoMutateToggle = Tabs.Machines:AddToggle("AutoMutateToggle", {
-    Title = "Auto Mutate",
-    Description = "Automatically cure and mutate selected pets.",
+    Title = "Enable Auto Mutate Loop",
+    Description = "Automatically handles curing and mutation loops.",
     Default = false,
 })
 
@@ -350,18 +424,51 @@ AutoMutateToggle:OnChanged(function(state)
             warn("Please select a pet name and a mutation before enabling Auto Mutate.")
             return
         end
-        print("Starting Auto Mutate Loop...")
         autoCureThenMutateLoop()
     else
         stopLoop = true
-        print("Stopping Auto Mutate Loop.")
     end
 end)
 
-Tabs.Machines:AddParagraph({
-    Title = "Auto Goliath",
-    Content = "Dm if it stops working, alsothe script works better if there si nothing in the machine at first"
+-- Add Button for Random Mutation
+Tabs.Machines:AddButton({
+    Title = "Randomly Mutate Pets",
+    Description = "Randomly mutate selected pet IDs without curing them.",
+    Callback = function()
+        if not selectedPetName then
+            warn("Please select a pet name before using the mutation button.")
+            return
+        end
+
+        local petsToMutate = {}
+        for _, petInfo in ipairs(ownedPetData[selectedPetName] or {}) do
+            if not petInfo.Locked then
+                table.insert(petsToMutate, petInfo.Id)
+            end
+        end
+
+        if #petsToMutate == 0 then
+            warn("No unlocked pets available for mutation.")
+            return
+        end
+
+        for _, petId in ipairs(petsToMutate) do
+            local mutateArgs = { [1] = petId, [2] = {} }
+            pcall(function()
+                PetCombineService.mutate:InvokeServer(unpack(mutateArgs))
+            end)
+        end
+
+        print("Random mutation applied to selected pets:", petsToMutate)
+        fetchOwnedPets() -- Refresh pet data after mutation
+    end,
 })
+
+-- Initial fetch and start dropdown refresh
+fetchOwnedPets()
+startDropdownRefresh()
+
+
 
 -- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -374,6 +481,10 @@ local CONFIG = {
     PET_REFRESH_INTERVAL = 30,  -- Interval to refresh huge/unlocked pets
 }
 
+
+-- Services and Remote Function
+local PetServiceRF = ReplicatedStorage.Packages.Knit.Services.PetService.RF:FindFirstChild("getOwned")
+local PetGoliathService = ReplicatedStorage.Packages.Knit.Services.PetGoliathService.RE
 
 -- Pet Data Management
 local ownedPetData = {} -- Maps pet names to their IDs
@@ -422,7 +533,7 @@ end
 -- Pet Dropdown
 local PetDropdown = Tabs.Machines:AddDropdown("SelectPet", {
     Title = "Select Your Pet",
-    Description = "Choose a pet you own (Huge and Unlocked).",
+    Description = "Choose the name of the pets you want to goliath (The pet will only appear if its a huge and is unlocked).",
     Values = petNames,
     Multi = false,
 })
@@ -477,7 +588,7 @@ If you want specific huge pets to stay huge, make sure to lock them.]]
 -- Auto Goliath Toggle
 local AutoGoliathToggle = Tabs.Machines:AddToggle("Auto Goliath", {
     Title = "Enable Auto Goliath",
-    Description = "Automatically run the Goliath logic after pets are selected.",
+    Description = "Star Auto Goliathing your pets.",
     State = false
 })
 
@@ -553,7 +664,6 @@ end)
 fetchPetData()
 startDropdownRefresh()
 periodicPetDataRefresh()
-
 
 
 
