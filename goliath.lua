@@ -189,6 +189,101 @@ Fluent:Notify({
     Duration = 8
 })
 
+
+local modelNames = {}
+local models = {}
+local armWrestlingFolder = workspace.GameObjects.ArmWrestling
+
+local function findModels(folder)
+    for _, item in pairs(folder:GetChildren()) do
+        if item:IsA("Folder") and item.Name ~= "PVP" then
+            local npcFolder = item:FindFirstChild("NPC")
+            if npcFolder then
+                for _, npc in pairs(npcFolder:GetChildren()) do
+                    if npc:IsA("Model") then
+                        table.insert(models, npc)
+                        table.insert(modelNames, npc.Name)
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function sortModels()
+    table.sort(models, function(a, b)
+        return a.Name < b.Name
+    end)
+    table.sort(modelNames)
+end
+
+findModels(armWrestlingFolder)
+sortModels()
+
+-- Reordered UI Elements (Dropdown at top)
+local modelDropdown = Tabs.AutoFight:AddDropdown("ModelDropdown", {
+    Title = "Select Boss",
+    Values = modelNames,
+    Multi = false,
+    Default = modelNames[1],
+})
+
+local function getFolderNumber(bossName)
+    for _, folder in pairs(armWrestlingFolder:GetChildren()) do
+        if folder:IsA("Folder") and folder:FindFirstChild("NPC") then
+            if folder.NPC:FindFirstChild(bossName) then
+                return folder.Name
+            end
+        end
+    end
+    return nil
+end
+
+-- Auto Fight in middle
+local AutoFightToggle = Tabs.AutoFight:AddToggle("AutoFight", {Title = "Auto Fight", Default = false })
+AutoFightToggle:OnChanged(function()
+    if AutoFightToggle.Value then
+        while AutoFightToggle.Value do
+            local selectedBoss = modelDropdown.Value
+            if selectedBoss then
+                local folderNumber = getFolderNumber(selectedBoss)
+                if folderNumber then
+                    local npcTable = workspace.GameObjects.ArmWrestling[folderNumber].NPC[selectedBoss].Table
+                    
+                    local args = {
+                        [1] = selectedBoss,
+                        [2] = npcTable,
+                        [3] = folderNumber
+                    }
+
+                    game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
+                end
+            end
+            wait(2) -- Changed to 2 seconds
+        end
+    end
+end)
+
+-- Auto Click at bottom
+local AutoClickToggle = Tabs.AutoFight:AddToggle("AutoClick", {Title = "Auto Click", Default = false })
+AutoClickToggle:OnChanged(function()
+    if AutoClickToggle.Value then
+        while AutoClickToggle.Value do
+            game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onClickRequest:FireServer()
+            wait(0.1) -- Changed to 0.1 seconds
+        end
+    end
+end)
+
+modelDropdown:OnChanged(function(Value) end)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Fluent",
+    Content = "The script has been loaded.",
+    Duration = 8
+})
 local Machines = Tabs.Machines
 local Section = Tabs.Machines:AddSection("Mutations")
 
