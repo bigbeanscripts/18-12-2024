@@ -146,6 +146,7 @@ local Tabs = {
     AutoTrain = Window:AddTab({ Title = "Auto Train", Icon = "axe" }),
     AutoFight = Window:AddTab({ Title = "Auto Fight", Icon = "angry" }),
     Eggs = Window:AddTab({ Title = "Eggs", Icon = "egg" }),
+    Christmas = Window:AddTab({ Title = "Christmas", Icon = "santa" }),
     Machines = Window:AddTab({ Title = "Machines", Icon = "star" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "shuffle" })
 }
@@ -189,6 +190,267 @@ Fluent:Notify({
     Duration = 8
 })
 
+local Section = Tabs.Christmas:AddSection("Auto Fight")
+-- Retrieve NPC names from the specific path
+local npcFolderPath = workspace.GameObjects.ArmWrestling.Frostlands.NPC
+local modelNames = {}
+local models = {}
+
+for _, npc in pairs(npcFolderPath:GetChildren()) do
+    if npc:IsA("Model") then
+        table.insert(models, npc)
+        table.insert(modelNames, npc.Name)
+    end
+end
+
+-- Sort NPC names alphabetically
+table.sort(modelNames)
+
+-- Reordered UI Elements (Dropdown at top)
+local modelDropdown = Tabs.Christmas:AddDropdown("ModelDropdown", {
+    Title = "Select Boss",
+    Values = modelNames,
+    Multi = false,
+    Default = modelNames[1],
+})
+
+-- Auto Fight in middle
+local AutoFightToggle = Tabs.Christmas:AddToggle("AutoFight", {Title = "Auto Fight", Default = false })
+AutoFightToggle:OnChanged(function()
+    if AutoFightToggle.Value then
+        while AutoFightToggle.Value do
+            local selectedNPC = modelDropdown.Value
+            if selectedNPC then
+                local npcModel = npcFolderPath:FindFirstChild(selectedNPC)
+                if npcModel and npcModel:FindFirstChild("Table") then
+                    local npcTable = npcModel.Table
+
+                    local args = {
+                        [1] = selectedNPC,
+                        [2] = npcTable,
+                        [3] = "Frostlands" -- Fixed folder reference for consistency
+                    }
+
+                    game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
+                end
+            end
+            wait(1) -- Changed to 2 seconds
+        end
+    end
+end)
+
+-- Auto Click at bottom
+local AutoClickToggle = Tabs.Christmas:AddToggle("AutoClick", {Title = "Auto Click", Default = false })
+AutoClickToggle:OnChanged(function()
+    if AutoClickToggle.Value then
+        while AutoClickToggle.Value do
+            game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onClickRequest:FireServer()
+            wait(0.1) -- Changed to 0.1 seconds
+        end
+    end
+end)
+
+modelDropdown:OnChanged(function(Value) end)
+
+
+-- Add section for NPC Farm
+local Section = Tabs.Christmas:AddSection("Auto NPC Farm")
+
+-- Track state
+local isAutoFarming = false
+local isBossFighting = false
+local snowstormPath = workspace.GameObjects.RngNPCs["Frostlands-Snowstorm"].Npc
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Function to hold E key with pattern
+local function holdEPattern()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    wait(1.5) -- Hold for 2 seconds
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    wait(0.5) -- Release for 0.5 seconds
+end
+
+-- Auto Beat NPC Toggle
+local AutoBeatNPCToggle = Tabs.Christmas:AddToggle("AutoBeatNPC", {
+    Title = "Auto Beat NPC",
+    Description = "Auto Fight the NPC's spawned in Snowstorms.",
+    Default = false
+})
+
+-- Auto Fight Boss Toggle
+local AutoFightBossToggle = Tabs.Christmas:AddToggle("AutoFightBoss", {
+    Title = "Auto Fight Boss",
+    Description = "Fight selected boss when no NPCs are present. -- Must have the Auto Beat NPC toggle enabled",
+    Default = false
+})
+
+AutoBeatNPCToggle:OnChanged(function()
+    isAutoFarming = AutoBeatNPCToggle.Value
+    
+    if isAutoFarming then
+        spawn(function()
+            while isAutoFarming do
+                local npcs = snowstormPath:GetChildren()
+                if #npcs > 0 then
+                    for _, npc in ipairs(npcs) do
+                        if not isAutoFarming then break end
+                        
+                        if npc:IsA("Model") and npc:FindFirstChild("Table") and 
+                           npc.Table:FindFirstChild("PlayerRoot") then
+                            -- Teleport to NPC
+                            local humanoid = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if humanoid then
+                                humanoid.CFrame = npc.Table.PlayerRoot.CFrame
+                                
+                                -- Start E key pattern
+                                spawn(function()
+                                    local startTime = tick()
+                                    while isAutoFarming and (tick() - startTime) < 4 do
+                                        holdEPattern()
+                                    end
+                                end)
+                                
+                                wait(4) -- Wait 4 seconds before next teleport
+                            end
+                        end
+                    end
+                elseif isBossFighting then
+                    -- Fight selected boss if no NPCs present
+                    local selectedNPC = modelDropdown.Value
+                    if selectedNPC then
+                        local npcModel = npcFolderPath:FindFirstChild(selectedNPC)
+                        if npcModel and npcModel:FindFirstChild("Table") then
+                            local args = {
+                                [1] = selectedNPC,
+                                [2] = npcModel.Table,
+                                [3] = "Frostlands"
+                            }
+                            game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
+                            
+                            -- Auto click while fighting boss
+                            for i = 1, 30 do
+                                if not isBossFighting then break end
+                                game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onClickRequest:FireServer()
+                                wait(0.1)
+                            end
+                        end
+                    end
+                end
+                wait(0.1)
+            end
+        end)
+    end
+end)
+
+AutoFightBossToggle:OnChanged(function()
+    isBossFighting = AutoFightBossToggle.Value
+end)
+
+local Section = Tabs.Christmas:AddSection("Free Gift")
+
+-- Auto Claim Santa Sleigh Gift toggle
+local AutoClaimToggle = Tabs.Christmas:AddToggle("AutoClaimSantaSleigh", { Title = "Auto Claim Santa Sleigh Gift", Default = false })
+AutoClaimToggle:OnChanged(function()
+    if AutoClaimToggle.Value then
+        while AutoClaimToggle.Value do
+            local args = {
+                [1] = "SantaSleigh"
+            }
+
+            -- Claim the Santa Sleigh gift
+            game:GetService("ReplicatedStorage").Packages.Knit.Services.FreeGiftService.RF.Claim:InvokeServer(unpack(args))
+            print("Santa Sleigh gift claimed!") -- Log for debugging
+            wait(30) -- Wait 30 seconds before claiming again
+        end
+    end
+end)
+
+local TowerSection = Tabs.Christmas:AddSection("Ice Tower")
+
+-- Auto Use Tower Key (1x) button
+TowerSection:AddButton({
+    Title = "Use Tower Key (1x)",
+    Description = "Use the Tower Key once.",
+    Callback = function()
+        local args = {
+            [1] = "IceTower",
+            [2] = false
+        }
+        -- Use the Tower Key (1x)
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Tower Key (1x)") -- Debugging log
+    end
+})
+
+-- Auto Use Tower Key (250x) button
+TowerSection:AddButton({
+    Title = "Use All Tower Keys (250x)",
+    Description = "Use All Tower Keys (max 250 at a time).",
+    Callback = function()
+        local args = {
+            [1] = "IceTower",
+            [2] = true
+        }
+        -- Use the Tower Key (250x)
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Tower Key (250x)") -- Debugging log
+    end
+})
+
+local WheelSection = Tabs.Christmas:AddSection("Ice Wheel")
+
+-- Auto Spin Wheel toggle
+local AutoSpinWheelToggle = Tabs.Christmas:AddToggle("AutoSpinWheel", {
+    Title = "Auto Spin Wheel",
+    Default = false
+})
+
+-- Add Spin Amount Dropdown
+local SpinDropdown = Tabs.Christmas:AddDropdown("SpinAmountDropdown", {
+    Title = "Select Spin Amount",
+    Values = {"1x", "3x", "10x"},
+    Multi = false,
+    Default = "1x",
+})
+
+-- Handle Auto Spin Wheel Toggle
+AutoSpinWheelToggle:OnChanged(function()
+    if AutoSpinWheelToggle.Value then
+        -- Start the Spin based on dropdown selection
+        SpinDropdown:OnChanged(function(Value)
+            if Value == "1x" then
+                while AutoSpinWheelToggle.Value and SpinDropdown.Value == "1x" do
+                    local args = {
+                        [1] = "Icy Fortune"
+                    }
+                    game:GetService("ReplicatedStorage").Packages.Knit.Services.SpinnerService.RF.Spin:InvokeServer(unpack(args))
+                    print("Used Spin (1x)") -- Debugging log
+                    wait(2) -- 2 seconds interval
+                end
+            elseif Value == "3x" then
+                while AutoSpinWheelToggle.Value and SpinDropdown.Value == "3x" do
+                    local args = {
+                        [1] = "Icy Fortune",
+                        [2] = "x10"
+                    }
+                    game:GetService("ReplicatedStorage").Packages.Knit.Services.SpinnerService.RF.Spin:InvokeServer(unpack(args))
+                    print("Used Spin (3x)") -- Debugging log
+                    wait(0.5) -- Faster interval for 3x spins
+                end
+            elseif Value == "10x" then
+                while AutoSpinWheelToggle.Value and SpinDropdown.Value == "10x" do
+                    local args = {
+                        [1] = "Icy Fortune",
+                        [2] = "x25"
+                    }
+                    game:GetService("ReplicatedStorage").Packages.Knit.Services.SpinnerService.RF.Spin:InvokeServer(unpack(args))
+                    print("Used Spin (10x)") -- Debugging log
+                    wait(0.3) -- Even faster interval for 10x spins
+                end
+            end
+        end)
+    end
+end)
 
 local modelNames = {}
 local models = {}
