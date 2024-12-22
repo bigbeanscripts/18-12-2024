@@ -252,8 +252,6 @@ end)
 
 modelDropdown:OnChanged(function(Value) end)
 
-
--- Add section for NPC Farm
 local Section = Tabs.Christmas:AddSection("Auto NPC Farm")
 
 -- Track state
@@ -265,7 +263,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 -- Function to hold E key with pattern
 local function holdEPattern()
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    wait(1.5) -- Hold for 2 seconds
+    wait(2) -- Hold for 2 seconds
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
     wait(0.5) -- Release for 0.5 seconds
 end
@@ -274,13 +272,6 @@ end
 local AutoBeatNPCToggle = Tabs.Christmas:AddToggle("AutoBeatNPC", {
     Title = "Auto Beat NPC",
     Description = "Auto Fight the NPC's spawned in Snowstorms.",
-    Default = false
-})
-
--- Auto Fight Boss Toggle
-local AutoFightBossToggle = Tabs.Christmas:AddToggle("AutoFightBoss", {
-    Title = "Auto Fight Boss",
-    Description = "Fight selected boss when no NPCs are present. -- Must have the Auto Beat NPC toggle enabled",
     Default = false
 })
 
@@ -304,13 +295,12 @@ AutoBeatNPCToggle:OnChanged(function()
                                 
                                 -- Start E key pattern
                                 spawn(function()
-                                    local startTime = tick()
-                                    while isAutoFarming and (tick() - startTime) < 4 do
+                                    while isAutoFarming do
                                         holdEPattern()
                                     end
                                 end)
                                 
-                                wait(4) -- Wait 4 seconds before next teleport
+                                wait(4) -- Wait before next teleport
                             end
                         end
                     end
@@ -326,13 +316,7 @@ AutoBeatNPCToggle:OnChanged(function()
                                 [3] = "Frostlands"
                             }
                             game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
-                            
-                            -- Auto click while fighting boss
-                            for i = 1, 30 do
-                                if not isBossFighting then break end
-                                game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onClickRequest:FireServer()
-                                wait(0.1)
-                            end
+                            wait(1) -- Wait 1 second between boss attempts
                         end
                     end
                 end
@@ -342,9 +326,17 @@ AutoBeatNPCToggle:OnChanged(function()
     end
 end)
 
+-- Auto Fight Boss Toggle
+local AutoFightBossToggle = Tabs.Christmas:AddToggle("AutoFightBoss", {
+    Title = "Auto Fight Boss",
+    Description = "Fight selected boss when no NPCs are present",
+    Default = false
+})
+
 AutoFightBossToggle:OnChanged(function()
     isBossFighting = AutoFightBossToggle.Value
 end)
+
 
 local Section = Tabs.Christmas:AddSection("Free Gift")
 
@@ -521,7 +513,7 @@ AutoFightToggle:OnChanged(function()
                     game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
                 end
             end
-            wait(2) -- Changed to 2 seconds
+            wait(1) -- Changed to 2 seconds
         end
     end
 end)
