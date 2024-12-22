@@ -287,10 +287,13 @@ Fluent:Notify({
 local Machines = Tabs.Machines
 local Section = Tabs.Machines:AddSection("Mutations")
 
+
 -- Services and Variables
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PetServiceRF = ReplicatedStorage.Packages.Knit.Services.PetService.RF:FindFirstChild("getOwned")
 local PetCombineService = ReplicatedStorage.Packages.Knit.Services.PetCombineService.RF
+local PetCureFn = PetCombineService:FindFirstChild("cure")
+local PetMutateFn = PetCombineService:FindFirstChild("mutate")
 
 local ownedPetData = {}  -- Store full pet data including locked status
 local uniquePetNames = {}
@@ -357,7 +360,7 @@ local function fetchOwnedPets()
     return false
 end
 
--- Create Pet Dropdown first
+-- Create Pet Dropdown
 local PetDropdown = Tabs.Machines:AddDropdown("PetDropdown", {
     Title = "Select Pet",
     Description = "Choose a specific unlocked pet name to mutate.",
@@ -392,7 +395,6 @@ PetDropdown:OnChanged(function(value)
     selectedPetName = value
     hasReportedCompletion = false
     
-    -- Print unlocked pet IDs for the selected pet
     if selectedPetName then
         local petInstances = ownedPetData[selectedPetName] or {}
         print("\nUnlocked Pet IDs for", selectedPetName .. ":")
@@ -416,13 +418,17 @@ MutationDropdown:OnChanged(function(value)
     hasReportedCompletion = false
 end)
 
+-- Add Keep Ghost Toggle (before using it in functions)
+local KeepGhostToggle = Tabs.Machines:AddToggle("KeepGhostToggle", {
+    Title = "Keep Ghost Pets",
+    Description = "Keep pets if they become Ghost mutation, even if Ghost isn't selected.",
+    Default = false,
+})
+
 local function shouldProcessPet(pet)
-    -- If Keep Ghost is enabled and pet is Ghost, don't process it
     if KeepGhostToggle.Value and pet.Mutation == "Ghost" then
         return false
     end
-    
-    -- Process if pet has no mutation or wrong mutation
     return pet.Mutation == "No Mutation" or pet.Mutation ~= selectedMutation
 end
 
@@ -437,7 +443,6 @@ local function checkAllPetsMutated()
     end
     
     for _, pet in pairs(petsToProcess) do
-        -- Consider a Ghost pet as "mutated" if Keep Ghost is enabled
         if KeepGhostToggle.Value and pet.Mutation == "Ghost" then
             continue
         end
@@ -475,18 +480,25 @@ local function autoCureThenMutateLoop()
                 if stopLoop then break end
 
                 if pet.Mutation ~= selectedMutation then
-                    -- Don't cure Ghost pets if Keep Ghost is enabled
                     if pet.Mutation ~= "No Mutation" and 
                        not (KeepGhostToggle.Value and pet.Mutation == "Ghost") then
-                        local cureArgs = { [1] = pet.Id }
-                        pcall(function()
-                            return PetCombineService.cure:InvokeServer(unpack(cureArgs))
-                        end)
+                        if PetCureFn then
+                            local cureArgs = { [1] = pet.Id }
+                            pcall(function()
+                                return PetCureFn:InvokeServer(unpack(cureArgs))
+                            end)
+                        else
+                            warn("Cure function not found!")
+                        end
                     elseif pet.Mutation == "No Mutation" then
-                        local mutateArgs = { [1] = pet.Id, [2] = {} }
-                        pcall(function()
-                            return PetCombineService.mutate:InvokeServer(unpack(mutateArgs))
-                        end)
+                        if PetMutateFn then
+                            local mutateArgs = { [1] = pet.Id, [2] = {} }
+                            pcall(function()
+                                return PetMutateFn:InvokeServer(unpack(mutateArgs))
+                            end)
+                        else
+                            warn("Mutate function not found!")
+                        end
                     end
                     wait(1)
                     fetchOwnedPets()
@@ -499,13 +511,6 @@ local function autoCureThenMutateLoop()
     end
 end
 
--- Add Keep Ghost Toggle
-local KeepGhostToggle = Tabs.Machines:AddToggle("KeepGhostToggle", {
-    Title = "Keep Ghost Pets",
-    Description = "Keep pets if they become Ghost mutation, even if Ghost isn't selected.",
-    Default = false,
-})
-
 -- Add Auto Mutate Toggle
 local AutoMutateToggle = Tabs.Machines:AddToggle("AutoMutateToggle", {
     Title = "Enable Auto Mutate Loop",
@@ -517,6 +522,7 @@ AutoMutateToggle:OnChanged(function(state)
     if state then
         if not selectedPetName or not selectedMutation then
             warn("Please select a pet name and a mutation before enabling Auto Mutate.")
+            AutoMutateToggle:Set(false)
             return
         end
         autoCureThenMutateLoop()
@@ -525,7 +531,7 @@ AutoMutateToggle:OnChanged(function(state)
     end
 end)
 
--- Add Button for Random Mutation
+-- Add Random Mutation Button
 Tabs.Machines:AddButton({
     Title = "Randomly Mutate Pets",
     Description = "Randomly mutate selected pet IDs without curing them.",
@@ -547,15 +553,18 @@ Tabs.Machines:AddButton({
             return
         end
 
-        for _, petId in ipairs(petsToMutate) do
-            local mutateArgs = { [1] = petId, [2] = {} }
-            pcall(function()
-                PetCombineService.mutate:InvokeServer(unpack(mutateArgs))
-            end)
+        if PetMutateFn then
+            for _, petId in ipairs(petsToMutate) do
+                local mutateArgs = { [1] = petId, [2] = {} }
+                pcall(function()
+                    PetMutateFn:InvokeServer(unpack(mutateArgs))
+                end)
+            end
+            print("Random mutation applied to selected pets:", petsToMutate)
+            fetchOwnedPets() -- Refresh pet data after mutation
+        else
+            warn("Mutate function not found!")
         end
-
-        print("Random mutation applied to selected pets:", petsToMutate)
-        fetchOwnedPets() -- Refresh pet data after mutation
     end,
 })
 
