@@ -844,7 +844,6 @@ local Section = Tabs.Machines:AddSection("Goliath")
 
 
 
-
 -- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -856,6 +855,32 @@ local CONFIG = {
     PET_REFRESH_INTERVAL = 30,  -- Interval to refresh huge/unlocked pets
 }
 
+-- Create window
+local Window = Fluent:CreateWindow({
+    Title = "Bean Hub",
+    SubTitle = "By Big Bean",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl,
+    OnDestroy = function()
+        if MinimizeGui then
+            local fadeOut = TweenService:Create(MinimizeGui, TweenInfo.new(0.5), {
+                Transparency = 1
+            })
+            fadeOut:Play()
+            fadeOut.Completed:Connect(function()
+                MinimizeGui:Destroy()
+            end)
+        end
+    end
+})
+
+-- Tabs
+local Tabs = {
+    Machines = Window:AddTab({ Title = "Machines", Icon = "star" })
+}
 
 -- Services and Remote Function
 local PetServiceRF = ReplicatedStorage.Packages.Knit.Services.PetService.RF:FindFirstChild("getOwned")
@@ -1039,6 +1064,7 @@ end)
 fetchPetData()
 startDropdownRefresh()
 periodicPetDataRefresh()
+
 
 
 
