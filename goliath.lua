@@ -190,6 +190,7 @@ Fluent:Notify({
     Duration = 8
 })
 
+
 local Section = Tabs.Christmas:AddSection("Auto Fight")
 -- Retrieve NPC names from the specific path
 local npcFolderPath = workspace.GameObjects.ArmWrestling.Frostlands.NPC
@@ -260,12 +261,11 @@ local isBossFighting = false
 local snowstormPath = workspace.GameObjects.RngNPCs["Frostlands-Snowstorm"].Npc
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
--- Function to hold E key with pattern
-local function holdEPattern()
+-- Function to hold E key for 2.5 seconds
+local function holdE()
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    wait(2) -- Hold for 2 seconds
+    wait(2.5) -- Hold for 2.5 seconds
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    wait(0.5) -- Release for 0.5 seconds
 end
 
 -- Auto Beat NPC Toggle
@@ -292,15 +292,8 @@ AutoBeatNPCToggle:OnChanged(function()
                             local humanoid = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                             if humanoid then
                                 humanoid.CFrame = npc.Table.PlayerRoot.CFrame
-                                
-                                -- Start E key pattern
-                                spawn(function()
-                                    while isAutoFarming do
-                                        holdEPattern()
-                                    end
-                                end)
-                                
-                                wait(4) -- Wait before next teleport
+                                wait(1.5) -- Wait 1 second after teleport
+                                holdE() -- Hold E for 2.5 seconds
                             end
                         end
                     end
@@ -316,7 +309,7 @@ AutoBeatNPCToggle:OnChanged(function()
                                 [3] = "Frostlands"
                             }
                             game:GetService("ReplicatedStorage").Packages.Knit.Services.ArmWrestleService.RE.onEnterNPCTable:FireServer(unpack(args))
-                            wait(1) -- Wait 1 second between boss attempts
+                            wait(1)
                         end
                     end
                 end
@@ -341,18 +334,37 @@ end)
 local Section = Tabs.Christmas:AddSection("Free Gift")
 
 -- Auto Claim Santa Sleigh Gift toggle
-local AutoClaimToggle = Tabs.Christmas:AddToggle("AutoClaimSantaSleigh", { Title = "Auto Claim Santa Sleigh Gift", Default = false })
+local AutoClaimToggle = Tabs.Christmas:AddToggle("AutoClaimSantaSleigh", { 
+    Title = "Auto Claim Santa Sleigh Gift", 
+    Default = false 
+})
+
 AutoClaimToggle:OnChanged(function()
     if AutoClaimToggle.Value then
         while AutoClaimToggle.Value do
             local args = {
                 [1] = "SantaSleigh"
             }
-
-            -- Claim the Santa Sleigh gift
             game:GetService("ReplicatedStorage").Packages.Knit.Services.FreeGiftService.RF.Claim:InvokeServer(unpack(args))
-            print("Santa Sleigh gift claimed!") -- Log for debugging
-            wait(30) -- Wait 30 seconds before claiming again
+            wait(30)
+        end
+    end
+end)
+
+-- Auto Claim Workshop Tree Gift toggle
+local AutoClaimWorkshopToggle = Tabs.Christmas:AddToggle("AutoClaimWorkshop", { 
+    Title = "Auto Claim Workshop Tree Gift", 
+    Default = false 
+})
+
+AutoClaimWorkshopToggle:OnChanged(function()
+    if AutoClaimWorkshopToggle.Value then
+        while AutoClaimWorkshopToggle.Value do
+            local args = {
+                [1] = "WorkshopTree"
+            }
+            game:GetService("ReplicatedStorage").Packages.Knit.Services.FreeGiftService.RF.Claim:InvokeServer(unpack(args))
+            wait(30)
         end
     end
 end)
@@ -443,6 +455,7 @@ AutoSpinWheelToggle:OnChanged(function()
         end)
     end
 end)
+
 
 local modelNames = {}
 local models = {}
