@@ -121,7 +121,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 -- Create window with destroy callback
 local Window = Fluent:CreateWindow({
     Title = "Bean Hub",
-    SubTitle = "By Big Bean",
+    SubTitle = "By Duckie",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true,
