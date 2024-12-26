@@ -369,35 +369,127 @@ AutoClaimWorkshopToggle:OnChanged(function()
     end
 end)
 
-local TowerSection = Tabs.Christmas:AddSection("Ice Tower")
 
--- Auto Use Tower Key (1x) button
+local IceySection = Tabs.Christmas:AddSection("Icey Merchant")
+
+local IceyMerchantDropdown = Tabs.Christmas:AddDropdown("IceyMerchantDropdown", {
+   Title = "Select Merchant Slot",
+   Values = {1, 2, 3, 4, 5},
+   Multi = true,
+   Default = {}
+})
+
+local AutoBuyToggle = Tabs.Christmas:AddToggle("AutoBuyToggle", {
+   Title = "Auto Buy (Selected Slots)",
+   Default = false
+})
+
+AutoBuyToggle:OnChanged(function()
+   if AutoBuyToggle.Value then
+       spawn(function()
+           while AutoBuyToggle.Value do
+               -- Buy 3 times
+               for i = 1, 3 do
+                   for number, isSelected in pairs(IceyMerchantDropdown.Value) do
+                       if isSelected then
+                           local args = {
+                               [1] = "Icey Merchant",
+                               [2] = number
+                           }
+                           game:GetService("ReplicatedStorage").Packages.Knit.Services.LimitedMerchantService.RF.BuyItem:InvokeServer(unpack(args))
+                           wait(1)
+                       end
+                   end
+               end
+               wait(30) -- Wait 30 seconds before next cycle
+           end
+       end)
+   end
+end)
+
+
+
+local TowerSection = Tabs.Christmas:AddSection("Towers")
+
+-- Ice Tower Buttons
 TowerSection:AddButton({
-    Title = "Use Tower Key (1x)",
-    Description = "Use the Tower Key once.",
+    Title = "Use Ice Tower Key (1x)",
+    Description = "Use the Ice Tower Key once.",
     Callback = function()
         local args = {
             [1] = "IceTower",
             [2] = false
         }
-        -- Use the Tower Key (1x)
         game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
-        print("Used Tower Key (1x)") -- Debugging log
+        print("Used Ice Tower Key (1x)")
     end
 })
 
--- Auto Use Tower Key (250x) button
 TowerSection:AddButton({
-    Title = "Use All Tower Keys (250x)",
-    Description = "Use All Tower Keys (max 250 at a time).",
+    Title = "Use All Ice Tower Keys (250x)",
+    Description = "Use All Ice Tower Keys (max 250 at a time).",
     Callback = function()
         local args = {
             [1] = "IceTower",
             [2] = true
         }
-        -- Use the Tower Key (250x)
         game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
-        print("Used Tower Key (250x)") -- Debugging log
+        print("Used Ice Tower Keys (250x)")
+    end
+})
+
+-- Scrooge Tower Buttons
+
+TowerSection:AddButton({
+    Title = "Use Scrooge Tower Key (1x)",
+    Description = "Use the Scrooge Tower Key once.",
+    Callback = function()
+        local args = {
+            [1] = "ScroogeLookout",
+            [2] = false
+        }
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Scrooge Tower Key (1x)")
+    end
+})
+
+TowerSection:AddButton({
+    Title = "Use All Scrooge Tower Keys (250x)",
+    Description = "Use All Scrooge Tower Keys (max 250 at a time).",
+    Callback = function()
+        local args = {
+            [1] = "ScroogeLookout",
+            [2] = true
+        }
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Scrooge Tower Keys (250x)")
+    end
+})
+
+-- Snowstorm Tower Buttons
+TowerSection:AddButton({
+    Title = "Use Snowstorm Tower Key (1x)",  -- Added missing comma here
+    Description = "Use the Snowstorm Tower Key once.",
+    Callback = function()
+        local args = {
+            [1] = "SnowstormTower",
+            [2] = false
+        }
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Snowstorm Tower Key (1x)")
+    end
+})
+
+TowerSection:AddButton({
+    Title = "Use All Snowstorm Tower Keys (250x)", 
+    Description = "Use All Snowstorm Tower Keys (max 250 at a time).",
+    Callback = function()
+        local args = {
+            [1] = "SnowstormTower",
+            [2] = true
+        }
+        game:GetService("ReplicatedStorage").Packages.Knit.Services.TowerService.RF.EnterTower:InvokeServer(unpack(args))
+        print("Used Snowstorm Tower Keys (250x)")
     end
 })
 
