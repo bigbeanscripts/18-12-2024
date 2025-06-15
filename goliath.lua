@@ -776,14 +776,6 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 -- Player
 local player = Players.LocalPlayer
 
--- Format merchant names helper (optional)
-local function formatMerchantName(name)
-    return name:gsub("(%u)", " %1"):gsub("^%s+", "")
-end
-
--- Variables
-local selectedMerchantItems = {}
-
 -- Get all possible items from LimitedMerchant module
 local function getAllItems()
     local LimitedMerchant = require(ReplicatedStorage.Data.LimitedMerchant)
@@ -799,12 +791,13 @@ local function getAllItems()
                         item.Price or 0,
                         typeof(item.Currency) == "string" and item.Currency or (typeof(item.Currency) == "table" and item.Currency.Item or "Unknown Currency")
                     )
-                    allItems[itemName] = {
+                    table.insert(allItems, {
+                        name = itemName,
                         merchant = merchantName,
                         slot = tonumber(slotIndex),
                         index = itemIndex,
                         raw = item
-                    }
+                    })
                 end
             end
         end
@@ -846,18 +839,22 @@ end
 -- UI Section
 local MerchantSection = Tabs.Main:AddSection("Merchants")
 
--- Populate dropdown from all items
-local allItemData = getAllItems()
+-- Get all items list and build name list + map
+local allItemDataList = getAllItems()
 local allItemNames = {}
-for name in pairs(allItemData) do
-    table.insert(allItemNames, name)
+local allItemDataMap = {}
+
+for _, itemInfo in ipairs(allItemDataList) do
+    table.insert(allItemNames, itemInfo.name)
+    allItemDataMap[itemInfo.name] = itemInfo
 end
+
 table.sort(allItemNames)
 
--- Dropdown UI (placed before toggle)
+-- Dropdown UI (before toggle)
 local MerchantDropdown = MerchantSection:AddDropdown("MerchantSelect", {
     Title = "Select Merchant Item(s)",
-    Description = "Choose items to auto-buy from merchants. Occasionally, slot 1 or 2 won't be recognised."
+    Description = "Choose items to auto-buy from merchants. Occasionally, slot 1 or 2 won't be recognised.",
     Values = allItemNames,
     Multi = true,
     Searchable = true,
@@ -908,16 +905,18 @@ AutoBuyToggle:OnChanged(function(enabled)
 
                 for itemName, isSelected in pairs(selectedMerchantItems) do
                     if isSelected then
-                        local info = allItemData[itemName]
-                        local liveInfo = liveData[info.merchant .. ":" .. tostring(info.slot)]
+                        local info = allItemDataMap[itemName]
+                        if info then
+                            local liveInfo = liveData[info.merchant .. ":" .. tostring(info.slot)]
 
-                        if liveInfo and liveInfo.index == info.index and liveInfo.stock and liveInfo.stock > 0 then
-                            local success, err = pcall(function()
-                                ReplicatedStorage.Packages.Knit.Services.LimitedMerchantService.RF.BuyItem:InvokeServer(info.merchant, info.slot)
-                            end)
+                            if liveInfo and liveInfo.index == info.index and liveInfo.stock and liveInfo.stock > 0 then
+                                local success, err = pcall(function()
+                                    ReplicatedStorage.Packages.Knit.Services.LimitedMerchantService.RF.BuyItem:InvokeServer(info.merchant, info.slot)
+                                end)
 
-                            if not success then
-                                -- silently ignore failure
+                                if not success then
+                                    -- silently ignore failure
+                                end
                             end
                         end
                     end
